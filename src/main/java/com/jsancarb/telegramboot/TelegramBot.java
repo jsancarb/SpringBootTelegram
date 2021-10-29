@@ -5,10 +5,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -36,13 +46,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 				Message message = update.getMessage();
 				if (message.getText().equals("/start")) {
 					try {
-						System.out.println(provinceCode("Barcelona"));
+						Map<String, String> provinces = provinceCode("ba");
+						SendMessage sendMessage = new SendMessage();
+						sendMessage.setChatId(message.getChatId().toString());
+						String response = "";
+						for (Entry<String, String> code : provinces.entrySet()) {
+							if (provinces.size() == 1) {
+								response = weatherPrediction(code.getValue());
+							} else {
+								response += "/prevision" + code.getKey() + "\n";
+							}
+						}
+						sendMessage.setText(response);
+						execute(sendMessage);
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 					handleBanna(message);
-				} else if (message.getText().equals("/tortilla")) {
+				} else if (message.getText().contains("ortilla")) {
 					handleReplyKeyboard(message);
 				}
 			}
@@ -65,11 +87,15 @@ public class TelegramBot extends TelegramLongPollingBot {
 		if (message.getText().equals("/tortilla")) {
 			ReplyKeyboardMarkup key = new ReplyKeyboardMarkup();
 			List<KeyboardRow> keyboardRow = new ArrayList<>();
-			List<KeyboardButton> buttons = new ArrayList<>();
-			buttons.add(new KeyboardButton("Tortilla muy hecha"));
-			buttons.add(new KeyboardButton("Tortilla medio hecha"));
-			buttons.add(new KeyboardButton("Tortilla cruda"));
-			keyboardRow.add(new KeyboardRow(buttons));
+			List<KeyboardButton> buttons1 = new ArrayList<>();
+			buttons1.add(new KeyboardButton("Tortilla muy hecha"));
+			List<KeyboardButton> buttons2 = new ArrayList<>();
+			buttons2.add(new KeyboardButton("Tortilla medio hecha"));
+			List<KeyboardButton> buttons3 = new ArrayList<>();
+			buttons3.add(new KeyboardButton("Tortilla cruda"));
+			keyboardRow.add(new KeyboardRow(buttons1));
+			keyboardRow.add(new KeyboardRow(buttons2));
+			keyboardRow.add(new KeyboardRow(buttons3));
 			key.setKeyboard(keyboardRow);
 			key.setOneTimeKeyboard(true);
 			sendMessage.setText("Hola " + message.getChat().getFirstName()
@@ -87,29 +113,65 @@ public class TelegramBot extends TelegramLongPollingBot {
 		execute(sendMessage);
 	}
 
-	private String weatherPrediction(String provinceCode) {
-		return null;
+	private static String weatherPrediction(String provinceCode) throws IOException {
+		TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+			public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+				return null;
+			}
+
+			public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+			}
+
+			public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+			}
+		} };
+
+		String prediction = "";
+
+		try {
+			SSLContext sc = SSLContext.getInstance("SSL");
+			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+			URLConnection con = new URL(AEMET_URL + provinceCode + "/?api_key=" + AEMET_KEY).openConnection();
+			BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			String line = "";
+			String doc = "";
+			while ((line = br.readLine()) != null) {
+				doc += line;
+			}
+			JSONObject pred = new JSONObject(doc);
+			con = new URL(pred.getString("datos")).openConnection();
+			br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			while ((line = br.readLine()) != null) {
+				prediction += line;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return prediction;
 	}
 
-	private String provinceCode(String provinceName) throws IOException {
-		String code = null;
+	private Map<String, String> provinceCode(String provinceName) throws IOException {
+		Map<String, String> codes = new HashMap<>();
 		InputStream is = new URL(OPEN_PROVINCE + provinceName).openStream();
-		JSONObject provinces = null;
+		JSONObject data = null;
 		try {
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
-			provinces = new JSONObject(br.readLine());
+			data = new JSONObject(br.readLine());
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
 			is.close();
 		}
-		System.out.println(provinces);
-		for (int i = 0; i < provinces.getJSONArray("records").length(); i++) {
-			JSONObject fields = new JSONObject(provinces.getJSONArray("records").get(i));
-			code = fields.toString();
+		JSONArray provinces = data.getJSONArray("records");
+		for (int i = 0; i < provinces.length(); i++) {
+			String codigo = provinces.getJSONObject(i).getJSONObject("fields").getString("codigo");
+			String name = provinces.getJSONObject(i).getJSONObject("fields").getString("provincia");
+			codes.put(name, codigo);
 		}
-		return code;
+		return codes;
 	}
 
 	@Override

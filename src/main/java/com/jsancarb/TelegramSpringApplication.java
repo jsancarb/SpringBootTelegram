@@ -13,14 +13,6 @@ public class TelegramSpringApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TelegramSpringApplication.class, args);
-		
-		try {
-			TelegramBotsApi botsApi= new TelegramBotsApi(DefaultBotSession.class);
-			botsApi.registerBot(new TelegramBot());
-		} catch (TelegramApiException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 	}
 
 }

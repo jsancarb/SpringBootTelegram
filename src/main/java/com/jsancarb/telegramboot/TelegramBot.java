@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,10 +24,11 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import lombok.NonNull;
 
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
@@ -45,71 +45,47 @@ public class TelegramBot extends TelegramLongPollingBot {
 			if (update.hasMessage()) {
 				Message message = update.getMessage();
 				if (message.getText().equals("/start")) {
-					try {
-						Map<String, String> provinces = provinceCode("ba");
-						SendMessage sendMessage = new SendMessage();
-						sendMessage.setChatId(message.getChatId().toString());
-						String response = "";
-						for (Entry<String, String> code : provinces.entrySet()) {
-							if (provinces.size() == 1) {
-								response = weatherPrediction(code.getValue());
-							} else {
-								response += "/prevision" + code.getKey() + "\n";
-							}
-						}
-						sendMessage.setText(response);
-						execute(sendMessage);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					handleBanna(message);
-				} else if (message.getText().contains("ortilla")) {
-					handleReplyKeyboard(message);
+					handleStart(message);
+				} else if (message.getText().startsWith("/prediccion")) {
+					handlePrevention(message);
 				}
 			}
-		} catch (TelegramApiException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 	}
 
-	private void handleBanna(Message message) throws TelegramApiException {
+	private void handleStart(Message message) throws TelegramApiException {
 		SendMessage sendMessage = new SendMessage();
 		sendMessage.setChatId(message.getChatId().toString());
-		sendMessage.setText("\uD83C\uDF4C");
+		sendMessage.setText("Hola " + message.getChat().getFirstName()
+				+ " soy tu chatbot favorito 😎 y puedo predecir el tiempo "
+				+ "solo tienes que usar el comando /prediccion: + el nombre de la provincia por ejemplo '/prediccion:barcelona'");
 		execute(sendMessage);
 	}
 
-	private void handleReplyKeyboard(Message message) throws TelegramApiException {
+	private void handlePrevention(Message message) throws Exception {
+		Map<String, String> provinces = provinceCode(message.getText().substring(12, message.getText().length()));
 		SendMessage sendMessage = new SendMessage();
 		sendMessage.setChatId(message.getChatId().toString());
-		if (message.getText().equals("/tortilla")) {
-			ReplyKeyboardMarkup key = new ReplyKeyboardMarkup();
-			List<KeyboardRow> keyboardRow = new ArrayList<>();
-			List<KeyboardButton> buttons1 = new ArrayList<>();
-			buttons1.add(new KeyboardButton("Tortilla muy hecha"));
-			List<KeyboardButton> buttons2 = new ArrayList<>();
-			buttons2.add(new KeyboardButton("Tortilla medio hecha"));
-			List<KeyboardButton> buttons3 = new ArrayList<>();
-			buttons3.add(new KeyboardButton("Tortilla cruda"));
-			keyboardRow.add(new KeyboardRow(buttons1));
-			keyboardRow.add(new KeyboardRow(buttons2));
-			keyboardRow.add(new KeyboardRow(buttons3));
-			key.setKeyboard(keyboardRow);
-			key.setOneTimeKeyboard(true);
-			sendMessage.setText("Hola " + message.getChat().getFirstName()
-					+ "\n te voy a hacer una pregunta exixtencial\n¿Como te gusta la tortilla?");
-			sendMessage.setReplyMarkup(key);
-		} else if (message.getText().equals("Tortilla muy hecha")) {
-			sendMessage.setText("Menos mal que soy un robot, si no te dejo de hablar....");
-		} else if (message.getText().equals("Tortilla medio hecha")) {
-			sendMessage.setText("Tiene que haber de todo.....");
-		} else if (message.getText().equals("Tortilla cruda")) {
-			sendMessage.setText("¡Oleeee!");
-		} else {
-			sendMessage.setText("¡Ale ya esta, no seas pesao!");
+		
+		String response = "¿Quisite decir?\n";
+		if (provinces.size() < 1) {
+			response = "No se han encontrado resultados";
 		}
+		if (message.getText().length() > 12) {
+			for (Entry<String, String> code : provinces.entrySet()) {
+				if (provinces.size() == 1) {
+					response = weatherPrediction(code.getValue());
+				} else {
+					response += "/prediccion:" + code.getKey() + "\n";
+				}
+			}
+		} else {
+			response = "Es necesario indicar el nombre de la provincia";
+		}
+		sendMessage.setText(response);
 		execute(sendMessage);
 	}
 
@@ -133,7 +109,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 			sc.init(null, trustAllCerts, new java.security.SecureRandom());
 			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 			URLConnection con = new URL(AEMET_URL + provinceCode + "/?api_key=" + AEMET_KEY).openConnection();
-			BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream(), "ISO-8859-1"));
 			String line = "";
 			String doc = "";
 			while ((line = br.readLine()) != null) {
@@ -141,10 +117,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 			}
 			JSONObject pred = new JSONObject(doc);
 			con = new URL(pred.getString("datos")).openConnection();
-			br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			br = new BufferedReader(new InputStreamReader(con.getInputStream(), "ISO-8859-1"));
 			while ((line = br.readLine()) != null) {
-				prediction += line;
+				prediction += line + "\n";
 			}
+			prediction = prediction.replaceAll("[\n]{2,}", "\n");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -157,11 +134,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 		InputStream is = new URL(OPEN_PROVINCE + provinceName).openStream();
 		JSONObject data = null;
 		try {
-			BufferedReader br = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
+			BufferedReader br = new BufferedReader(new InputStreamReader(is, "ISO-8859-1"));
 			data = new JSONObject(br.readLine());
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			return codes;
 		} finally {
 			is.close();
 		}

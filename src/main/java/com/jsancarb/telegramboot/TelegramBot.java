@@ -24,11 +24,11 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
-import lombok.NonNull;
 
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
@@ -36,8 +36,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 	private static final String TELEGRAM_USER = "jsancarbBot";
 	private static final String TELEGRAM_KEY = "2076236232:AAG0_DURSU4G-rslA4pAMfe7jbKRQPG8p-g";
 	private static final String AEMET_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqc2FuY2FyYkBnbWFpbC5jb20iLCJqdGkiOiJkZTQ1M2RhYS0wNzcxLTRiZGItYjYxYi04ZmZkOGNkMWE3MTkiLCJpc3MiOiJBRU1FVCIsImlhdCI6MTYzNTQ4NTY5NSwidXNlcklkIjoiZGU0NTNkYWEtMDc3MS00YmRiLWI2MWItOGZmZDhjZDFhNzE5Iiwicm9sZSI6IiJ9.RLQJS9N8uqPQzhkntKsqPWPDkB4ht92jI_BIWf598S8";
-	private static final String AEMET_URL = "https://opendata.aemet.es/opendata/api/prediccion/provincia/hoy/";
-	private static final String OPEN_PROVINCE = "https://public.opendatasoft.com/api/records/1.0/search/?dataset=provincias-espanolas&q=";
+	private static final String AEMET_URL = "https://opendata.aemet.es/opendata/api/prediccion/provincia/manana/";
+	private static final String OPEN_PROVINCE = "https://public.opendatasoft.com/api/records/1.0/search/?dataset=provincias-espanolas&q=*";
 
 	@Override
 	public void onUpdateReceived(Update update) {
@@ -46,7 +46,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 				Message message = update.getMessage();
 				if (message.getText().equals("/start")) {
 					handleStart(message);
-				} else if (message.getText().startsWith("/prediccion")) {
+				} else if (message.getText().startsWith("/tiempo")) {
 					handlePrevention(message);
 				}
 			}
@@ -60,31 +60,42 @@ public class TelegramBot extends TelegramLongPollingBot {
 		SendMessage sendMessage = new SendMessage();
 		sendMessage.setChatId(message.getChatId().toString());
 		sendMessage.setText("Hola " + message.getChat().getFirstName()
-				+ " soy tu chatbot favorito 😎 y puedo predecir el tiempo "
-				+ "solo tienes que usar el comando /prediccion: + el nombre de la provincia por ejemplo '/prediccion:barcelona'");
+				+ ", soy tu chatbot favorito 😎 y puedo predecir el tiempo "
+				+ "solo tienes que usar el comando /tiempo + el nombre de la provincia por ejemplo '/tiempo barcelona'");
+		execute(sendMessage);
+		sendMessage.setText("⛅");
 		execute(sendMessage);
 	}
 
 	private void handlePrevention(Message message) throws Exception {
-		Map<String, String> provinces = provinceCode(message.getText().substring(12, message.getText().length()));
+		String response = "¿Quisite decir?\n";
 		SendMessage sendMessage = new SendMessage();
 		sendMessage.setChatId(message.getChatId().toString());
 		
-		String response = "¿Quisite decir?\n";
-		if (provinces.size() < 1) {
-			response = "No se han encontrado resultados";
-		}
-		if (message.getText().length() > 12) {
+		List<KeyboardRow> rowKeys = new ArrayList<>();
+		ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+		replyKeyboardMarkup.setOneTimeKeyboard(true);
+		
+		if (message.getText().length() > 7) {
+			Map<String, String> provinces = provinceCode(message.getText().substring(7, message.getText().length()));
+			if (provinces.size() < 1) {
+				response = "No se han encontrado resultados";
+			}
 			for (Entry<String, String> code : provinces.entrySet()) {
 				if (provinces.size() == 1) {
 					response = weatherPrediction(code.getValue());
 				} else {
-					response += "/prediccion:" + code.getKey() + "\n";
+					KeyboardRow keyboardRow = new KeyboardRow();
+					keyboardRow.add(new KeyboardButton("/tiempo " + code.getKey()));
+					rowKeys.add(keyboardRow);
 				}
 			}
 		} else {
 			response = "Es necesario indicar el nombre de la provincia";
 		}
+		
+		replyKeyboardMarkup.setKeyboard(rowKeys);
+		sendMessage.setReplyMarkup(replyKeyboardMarkup);
 		sendMessage.setText(response);
 		execute(sendMessage);
 	}
@@ -131,7 +142,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 	private Map<String, String> provinceCode(String provinceName) throws IOException {
 		Map<String, String> codes = new HashMap<>();
-		InputStream is = new URL(OPEN_PROVINCE + provinceName).openStream();
+		if(provinceName.matches(".*(v|V)al(e|è|é)ncia")) {
+			codes.put("Valencia", "46");
+			return codes;
+		}
+		InputStream is = new URL(OPEN_PROVINCE + provinceName + "*").openStream();
 		JSONObject data = null;
 		try {
 			BufferedReader br = new BufferedReader(new InputStreamReader(is, "ISO-8859-1"));
@@ -144,7 +159,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 		JSONArray provinces = data.getJSONArray("records");
 		for (int i = 0; i < provinces.length(); i++) {
 			String codigo = provinces.getJSONObject(i).getJSONObject("fields").getString("codigo");
-			String name = provinces.getJSONObject(i).getJSONObject("fields").getString("provincia");
+			String name = provinces.getJSONObject(i).getJSONObject("fields").getString("texto");
 			codes.put(name, codigo);
 		}
 		return codes;

@@ -24,7 +24,6 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
@@ -34,8 +33,8 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class TelegramBot extends TelegramLongPollingBot {
 
 	private static final String TELEGRAM_USER = "jsancarbBot";
-	private static final String TELEGRAM_KEY = "2076236232:AAG0_DURSU4G-rslA4pAMfe7jbKRQPG8p-g";
-	private static final String AEMET_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqc2FuY2FyYkBnbWFpbC5jb20iLCJqdGkiOiJkZTQ1M2RhYS0wNzcxLTRiZGItYjYxYi04ZmZkOGNkMWE3MTkiLCJpc3MiOiJBRU1FVCIsImlhdCI6MTYzNTQ4NTY5NSwidXNlcklkIjoiZGU0NTNkYWEtMDc3MS00YmRiLWI2MWItOGZmZDhjZDFhNzE5Iiwicm9sZSI6IiJ9.RLQJS9N8uqPQzhkntKsqPWPDkB4ht92jI_BIWf598S8";
+	private static final String TELEGRAM_KEY = "";
+	private static final String AEMET_KEY = "";
 	private static final String AEMET_URL = "https://opendata.aemet.es/opendata/api/prediccion/provincia/manana/";
 	private static final String OPEN_PROVINCE = "https://public.opendatasoft.com/api/records/1.0/search/?dataset=provincias-espanolas&q=*";
 
